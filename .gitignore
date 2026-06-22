@@ -1,0 +1,5 @@
+GreenServe/
+__pycache__/
+*.pyc
+.env
+carbon_forecast.csv

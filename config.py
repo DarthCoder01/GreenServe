@@ -1,6 +1,10 @@
-USERNAME = "Ashith_Rao_K"
-PASSWORD = "ccbd@123"
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
+
+USERNAME = os.getenv("WATTTIME_USERNAME")
+PASSWORD = os.getenv("WATTTIME_PASSWORD")
 REGION = "CAISO_NORTH"
 
 DIRTY_THRESHOLD = 940
