@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GreenServe — Carbon-Aware Scheduler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0A0E13;
+    --bg-panel: #12181F;
+    --bg-panel-raised: #161D26;
+    --border: #232C36;
+    --border-soft: #1B232C;
+    --text: #E7EDF3;
+    --text-muted: #7E8CA0;
+    --text-faint: #4D5A6B;
+
+    --clean: #34D399;
+    --clean-glow: rgba(52, 211, 153, 0.35);
+    --normal: #F5B940;
+    --normal-glow: rgba(245, 185, 64, 0.35);
+    --dirty: #F2674B;
+    --dirty-glow: rgba(242, 103, 75, 0.35);
+    --live: #38BDF8;
+
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(56, 189, 248, 0.06), transparent 40%),
+      radial-gradient(circle at 85% 100%, rgba(52, 211, 153, 0.05), transparent 40%);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+  }
+
+  a, button { font-family: inherit; }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 28px 24px 60px;
+  }
+
+  /* ---------- HEADER ---------- */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--clean), var(--live));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 17px;
+    color: #06140F;
+    flex-shrink: 0;
+  }
+
+  .brand-text h1 {
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: 0.2px;
+  }
+
+  .brand-text p {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .live-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 7px 14px 7px 10px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    letter-spacing: 0.4px;
+  }
+
+  .live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--live);
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.6);
+    animation: pulse 2s infinite;
+  }
+  .live-dot.off { background: var(--text-faint); animation: none; box-shadow: none; }
+
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.55); }
+    70%  { box-shadow: 0 0 0 6px rgba(56, 189, 248, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+  }
+
+  /* ---------- CONNECTION BANNER ---------- */
+  .banner {
+    display: none;
+    border: 1px solid rgba(242, 103, 75, 0.4);
+    background: rgba(242, 103, 75, 0.08);
+    color: #FFB9A8;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 12.5px;
+    margin-bottom: 20px;
+    line-height: 1.55;
+  }
+  .banner.show { display: block; }
+  .banner code {
+    background: rgba(0,0,0,0.25);
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: #fff;
+  }
+
+  /* ---------- TOP GRID ---------- */
+  .top-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+  @media (max-width: 760px) {
+    .top-grid { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin: 0 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .eyebrow .ts {
+    color: var(--text-faint);
+    letter-spacing: 0.3px;
+    text-transform: none;
+    font-size: 10.5px;
+  }
+
+  /* ---------- GAUGE ---------- */
+  .gauge-panel { display: flex; flex-direction: column; align-items: center; }
+
+  .gauge-wrap { width: 100%; max-width: 280px; position: relative; }
+
+  .gauge-readout {
+    text-align: center;
+    margin-top: -34px;
+  }
+
+  .gauge-value {
+    font-family: var(--font-display);
+    font-size: 46px;
+    font-weight: 700;
+    line-height: 1;
+    transition: color 0.6s ease;
+  }
+
+  .gauge-unit {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    letter-spacing: 0.5px;
+  }
+
+  .zone-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 14px;
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    border: 1px solid transparent;
+  }
+  .zone-badge .sq { width: 7px; height: 7px; border-radius: 2px; }
+
+  .zone-clean  { color: var(--clean);  background: rgba(52,211,153,0.1);  border-color: rgba(52,211,153,0.3); }
+  .zone-clean .sq  { background: var(--clean); }
+  .zone-normal { color: var(--normal); background: rgba(245,185,64,0.1); border-color: rgba(245,185,64,0.3); }
+  .zone-normal .sq { background: var(--normal); }
+  .zone-dirty  { color: var(--dirty);  background: rgba(242,103,75,0.1); border-color: rgba(242,103,75,0.3); }
+  .zone-dirty .sq  { background: var(--dirty); }
+  .zone-unknown { color: var(--text-muted); background: rgba(126,140,160,0.08); border-color: var(--border); }
+  .zone-unknown .sq { background: var(--text-faint); }
+
+  /* ---------- SCHEDULER PANEL ---------- */
+  .sched-action {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  .sched-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0 0 20px;
+    line-height: 1.5;
+  }
+
+  .tier-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-top: 1px solid var(--border-soft);
+  }
+  .tier-row:first-of-type { border-top: none; padding-top: 0; }
+
+  .tier-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .tier-dot { width: 9px; height: 9px; border-radius: 50%; }
+  .tier-gold .tier-dot { background: #E8B93F; }
+  .tier-silver .tier-dot { background: #B9C2CC; }
+  .tier-bronze .tier-dot { background: #C9824D; }
+
+  .tier-status {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    padding: 4px 11px;
+    border-radius: 100px;
+  }
+  .status-running { color: var(--clean); background: rgba(52,211,153,0.1); }
+  .status-deferred { color: var(--dirty); background: rgba(242,103,75,0.1); }
+
+  /* ---------- QUEUE PANEL ---------- */
+  .queue-panel { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px; }
+
+  .queue-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .submit-form {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  select, .btn {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel-raised);
+    color: var(--text);
+    padding: 9px 12px;
+  }
+
+  select:focus, .btn:focus-visible {
+    outline: 2px solid var(--live);
+    outline-offset: 1px;
+  }
+
+  .btn {
+    cursor: pointer;
+    font-weight: 600;
+    background: var(--live);
+    color: #06222F;
+    border: none;
+    transition: filter 0.15s ease, transform 0.1s ease;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+
+  .queue-list { display: flex; flex-direction: column; }
+
+  .queue-row {
+    display: grid;
+    grid-template-columns: 50px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 4px;
+    border-top: 1px solid var(--border-soft);
+    font-size: 13px;
+    animation: rowIn 0.35s ease;
+  }
+  .queue-row:first-child { border-top: none; }
+
+  @keyframes rowIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .queue-id { color: var(--text-faint); font-size: 12px; }
+
+  .tier-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    text-transform: capitalize;
+  }
+  .tier-tag .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .tag-gold .dot { background: #E8B93F; }
+  .tag-silver .dot { background: #B9C2CC; }
+  .tag-bronze .dot { background: #C9824D; }
+  .tag-other .dot { background: var(--text-faint); }
+
+  .empty-state {
+    text-align: center;
+    padding: 36px 12px;
+    color: var(--text-faint);
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+
+  footer {
+    text-align: center;
+    margin-top: 32px;
+    color: var(--text-faint);
+    font-size: 11px;
+    letter-spacing: 0.3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .live-dot, .queue-row { animation: none; }
+    .gauge-value, #needle { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark">GS</div>
+      <div class="brand-text">
+        <h1>GreenServe</h1>
+        <p>Carbon-aware scheduler for vLLM</p>
+      </div>
+    </div>
+    <div class="live-pill">
+      <span class="live-dot" id="liveDot"></span>
+      <span id="liveText">connecting…</span>
+    </div>
+  </header>
+
+  <div class="banner" id="errorBanner">
+    Can't reach the GreenServe API at <code id="apiBaseLabel"></code>.
+    Make sure <code>uvicorn main:app --reload</code> is running, and that
+    CORS is enabled in <code>main.py</code> so the browser can read the response.
+  </div>
+
+  <div class="top-grid">
+
+    <div class="panel gauge-panel">
+      <p class="eyebrow" style="width:100%;">
+        <span>Carbon signal</span>
+        <span class="ts" id="carbonTs">—</span>
+      </p>
+      <div class="gauge-wrap">
+        <svg viewBox="0 0 220 130" id="gaugeSvg">
+          <!-- background track -->
+          <path d="M 14 116 A 96 96 0 0 1 206 116" fill="none" stroke="#1B232C" stroke-width="14" stroke-linecap="round"/>
+          <!-- zone arcs: clean / normal / dirty (domain 700 - 1050) -->
+          <path id="arcClean"  fill="none" stroke="#34D399" stroke-width="14" stroke-linecap="round" opacity="0.85"/>
+          <path id="arcNormal" fill="none" stroke="#F5B940" stroke-width="14" stroke-linecap="round" opacity="0.85"/>
+          <path id="arcDirty"  fill="none" stroke="#F2674B" stroke-width="14" stroke-linecap="round" opacity="0.85"/>
+          <!-- needle -->
+          <g id="needle" style="transition: transform 0.7s cubic-bezier(.4,1.4,.4,1);" transform="rotate(0 110 116)">
+            <line x1="110" y1="116" x2="110" y2="38" stroke="#E7EDF3" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="110" cy="116" r="6.5" fill="#E7EDF3"/>
+          </g>
+        </svg>
+      </div>
+      <div class="gauge-readout">
+        <div class="gauge-value" id="carbonValue" style="color:var(--text-muted)">—</div>
+        <div class="gauge-unit">gCO₂ / kWh · WattTime MOER</div>
+        <div class="zone-badge zone-unknown" id="zoneBadge">
+          <span class="sq"></span><span id="zoneLabel">AWAITING SIGNAL</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="eyebrow"><span>Scheduler decision</span></p>
+      <h2 class="sched-action" id="schedAction">Standing by</h2>
+      <p class="sched-sub" id="schedSub">Waiting for the first carbon reading from the API.</p>
+
+      <div class="tier-row tier-gold">
+        <span class="tier-name"><span class="tier-dot"></span>Gold</span>
+        <span class="tier-status" id="tierGold">—</span>
+      </div>
+      <div class="tier-row tier-silver">
+        <span class="tier-name"><span class="tier-dot"></span>Silver</span>
+        <span class="tier-status" id="tierSilver">—</span>
+      </div>
+      <div class="tier-row tier-bronze">
+        <span class="tier-name"><span class="tier-dot"></span>Bronze</span>
+        <span class="tier-status" id="tierBronze">—</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="queue-panel">
+    <div class="queue-header">
+      <p class="eyebrow" style="margin:0;"><span>Request queue</span></p>
+      <div class="submit-form">
+        <select id="prioritySelect" aria-label="Job priority tier">
+          <option value="gold">gold</option>
+          <option value="silver">silver</option>
+          <option value="bronze">bronze</option>
+        </select>
+        <button class="btn" id="submitBtn">Submit test job</button>
+      </div>
+    </div>
+    <div class="queue-list" id="queueList">
+      <div class="empty-state">No jobs queued yet — submit one above to see scheduling in action.</div>
+    </div>
+  </div>
+
+  <footer>GreenServe · Team 2 · HPE Carrier Preview Program</footer>
+
+</div>
+
+<script>
+  // ---- config ----------------------------------------------------------
+  const API_BASE = "http://127.0.0.1:8000";   // change if your uvicorn host/port differ
+  const POLL_MS = 5000;
+  const GAUGE_MIN = 700, GAUGE_MAX = 1050;     // must bracket DIRTY/GREEN thresholds from config.py
+  const GREEN_THRESHOLD = 920, DIRTY_THRESHOLD = 940; // mirror config.py
+
+  // ---- gauge geometry ----------------------------------------------------
+  // semicircle from 180deg (left) to 0deg (right), radius 96, center (110,116)
+  function angleForValue(v) {
+    const clamped = Math.max(GAUGE_MIN, Math.min(GAUGE_MAX, v));
+    const t = (clamped - GAUGE_MIN) / (GAUGE_MAX - GAUGE_MIN);
+    return -90 + t * 180; // -90deg (left) .. +90deg (right)
+  }
+  function pointOnArc(angleDeg, r) {
+    const rad = (angleDeg - 90) * Math.PI / 180;
+    return { x: 110 + r * Math.cos(rad), y: 116 + r * Math.sin(rad) };
+  }
+  function arcPath(fromVal, toVal, r) {
+    const a1 = angleForValue(fromVal), a2 = angleForValue(toVal);
+    const p1 = pointOnArc(a1, r), p2 = pointOnArc(a2, r);
+    return `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} A ${r} ${r} 0 0 1 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
+  }
+
+  document.getElementById('arcClean').setAttribute('d', arcPath(GAUGE_MIN, GREEN_THRESHOLD, 96));
+  document.getElementById('arcNormal').setAttribute('d', arcPath(GREEN_THRESHOLD, DIRTY_THRESHOLD, 96));
+  document.getElementById('arcDirty').setAttribute('d', arcPath(DIRTY_THRESHOLD, GAUGE_MAX, 96));
+
+  document.getElementById('apiBaseLabel').textContent = API_BASE;
+
+  // ---- helpers -----------------------------------------------------------
+  function zoneFor(status) {
+    if (status === 'GREEN')  return { cls: 'zone-clean',  color: 'var(--clean)',  label: 'CLEAN GRID' };
+    if (status === 'DIRTY')  return { cls: 'zone-dirty',  color: 'var(--dirty)',  label: 'DIRTY GRID' };
+    if (status === 'NORMAL') return { cls: 'zone-normal', color: 'var(--normal)', label: 'MODERATE GRID' };
+    return { cls: 'zone-unknown', color: 'var(--text-muted)', label: 'AWAITING SIGNAL' };
+  }
+
+  function actionCopy(action) {
+    switch (action) {
+      case 'RUN_ALL':
+        return { title: 'Run everything', sub: 'Carbon is clean enough to run all SLA tiers at full throughput.' };
+      case 'RUN_GOLD_SILVER':
+        return { title: 'Run gold + silver', sub: 'Moderate carbon — bronze (best-effort) traffic is deferred to protect grid impact.' };
+      case 'DEFER_BRONZE':
+        return { title: 'Defer bronze', sub: 'Grid is dirty — bronze jobs are held back; gold and silver SLAs still run.' };
+      default:
+        return { title: 'Standing by', sub: 'Waiting for the first carbon reading from the API.' };
+    }
+  }
+
+  function tierStatusFor(action, tier) {
+    if (action === 'RUN_ALL') return 'running';
+    if (action === 'RUN_GOLD_SILVER' || action === 'DEFER_BRONZE') {
+      return tier === 'bronze' ? 'deferred' : 'running';
+    }
+    return null;
+  }
+
+  function setTierBadge(el, state) {
+    if (!state) { el.textContent = '—'; el.className = 'tier-status'; return; }
+    el.textContent = state === 'running' ? 'Running' : 'Deferred';
+    el.className = 'tier-status ' + (state === 'running' ? 'status-running' : 'status-deferred');
+  }
+
+  function setLive(ok) {
+    document.getElementById('liveDot').classList.toggle('off', !ok);
+    document.getElementById('liveText').textContent = ok ? 'live' : 'offline';
+    document.getElementById('errorBanner').classList.toggle('show', !ok);
+  }
+
+  function fmtTime() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  // ---- render --------------------------------------------------------------
+  function renderCarbon(data) {
+    const carbon = data.carbon;
+    const decision = data.decision || {};
+    const zone = zoneFor(decision.status);
+
+    const valueEl = document.getElementById('carbonValue');
+    valueEl.textContent = (typeof carbon === 'number') ? carbon.toFixed(1) : '—';
+    valueEl.style.color = zone.color;
+
+    const badge = document.getElementById('zoneBadge');
+    badge.className = 'zone-badge ' + zone.cls;
+    document.getElementById('zoneLabel').textContent = zone.label;
+
+    document.getElementById('needle').setAttribute(
+      'transform', `rotate(${angleForValue(carbon)} 110 116)`
+    );
+
+    const copy = actionCopy(decision.action);
+    document.getElementById('schedAction').textContent = copy.title;
+    document.getElementById('schedSub').textContent = copy.sub;
+
+    setTierBadge(document.getElementById('tierGold'),   tierStatusFor(decision.action, 'gold'));
+    setTierBadge(document.getElementById('tierSilver'), tierStatusFor(decision.action, 'silver'));
+    setTierBadge(document.getElementById('tierBronze'), tierStatusFor(decision.action, 'bronze'));
+
+    document.getElementById('carbonTs').textContent = 'updated ' + fmtTime();
+  }
+
+  function tierClass(priority) {
+    const p = (priority || '').toLowerCase();
+    if (p === 'gold' || p === 'silver' || p === 'bronze') return 'tag-' + p;
+    return 'tag-other';
+  }
+
+  function renderQueue(jobs) {
+    const list = document.getElementById('queueList');
+    if (!jobs || jobs.length === 0) {
+      list.innerHTML = '<div class="empty-state">No jobs queued yet — submit one above to see scheduling in action.</div>';
+      return;
+    }
+    list.innerHTML = jobs.slice().reverse().map(job => `
+      <div class="queue-row">
+        <span class="queue-id">#${job.id}</span>
+        <span class="tier-tag ${tierClass(job.priority)}"><span class="dot"></span>${job.priority}</span>
+        <span></span>
+      </div>
+    `).join('');
+  }
+
+  // ---- networking ------------------------------------------------------
+  async function pollStatus() {
+    try {
+      const [statusRes, queueRes] = await Promise.all([
+        fetch(API_BASE + '/'),
+        fetch(API_BASE + '/queue')
+      ]);
+      if (!statusRes.ok || !queueRes.ok) throw new Error('bad response');
+      const status = await statusRes.json();
+      const queue = await queueRes.json();
+      renderCarbon(status);
+      renderQueue(queue);
+      setLive(true);
+    } catch (err) {
+      setLive(false);
+    }
+  }
+
+  document.getElementById('submitBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('submitBtn');
+    const priority = document.getElementById('prioritySelect').value;
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+    try {
+      const res = await fetch(`${API_BASE}/submit/${priority}`, { method: 'POST' });
+      if (!res.ok) throw new Error('submit failed');
+      await pollStatus();
+    } catch (err) {
+      setLive(false);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Submit test job';
+    }
+  });
+
+  pollStatus();
+  setInterval(pollStatus, POLL_MS);
+</script>
+
+</body>
+</html>
